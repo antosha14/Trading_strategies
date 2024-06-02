@@ -1,3 +1,6 @@
 /static
 /database/pgdata
 /app/__pycache__
+/database/.env
+/nginx/.env
+/data_filler/.env

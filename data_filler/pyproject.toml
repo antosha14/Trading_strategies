@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "data-filler"
+version = "0.1.0"
+description = "App for gathering data about Bitcoin from Binance and SPY found from yahoo finance"
+authors = ["Anton Kozel"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.111.0"
+sqlalchemy = "^2.0.30"
+sqlmodel = "^0.0.18"
+tenacity = "^8.3.0"
+passlib = "^1.7.4"
+pydantic-settings = "^2.2.1"
+alembic = "^1.13.1"
+psycopg2 = "^2.9.9"
+python-jose = "^3.3.0"
+yfinance = "^0.2.38"
+websocket-client = "^1.8.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
