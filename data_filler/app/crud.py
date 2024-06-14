@@ -1,5 +1,5 @@
-from db import engine
-from models import BTC_TimestampData, SAP_TimestampData
+from app.db import engine
+from app.models import BTC_TimestampData, SAP_TimestampData
 from sqlmodel import Session
 
 

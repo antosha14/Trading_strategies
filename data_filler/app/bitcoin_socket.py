@@ -2,13 +2,13 @@
 import json
 from datetime import datetime
 
-import crud
+import app.crud as crud
 import numpy as np
 import requests
 import websocket
-from config import settings
-from models import BTC_TimestampData
-from telegram_messaging import send_telegram_message
+from app.config import settings
+from app.models import BTC_TimestampData
+from app.tasks.telegram_messaging import send_telegram_message
 
 btc_ticker_for_binance = "BTCUSDT"
 btc_subscribtion_str = (
@@ -64,8 +64,10 @@ def on_message(ws, message):
         ][0]
 
         for price, volume in bid_arr_to_update:
-            if price in matching_bid_prices:
-                ind = np.where(current_bids_arr[:, 0] == price)
+            ind = np.where(current_bids_arr[:, 0] == price)
+            if volume == 0:
+                current_bids_arr = np.delete(current_bids_arr, ind, axis=0)
+            elif price in matching_bid_prices:
                 current_bids_arr[ind, 1] = volume
             else:
                 current_bids_arr = np.vstack([current_bids_arr, [price, volume]])
@@ -79,9 +81,12 @@ def on_message(ws, message):
         highest_5000_bids = sorted_partly_filtered_current_bids[:5000]
         volume_of_5000_bids = np.sum(highest_5000_bids[:, 1])
 
-        weighted_avg_bid_price = np.average(
-            highest_5000_bids[:, 0], weights=highest_5000_bids[:, 1]
-        )
+        if volume_of_5000_bids == 0:
+            weighted_avg_bid_price = 0
+        else:
+            weighted_avg_bid_price = np.average(
+                highest_5000_bids[:, 0], weights=highest_5000_bids[:, 1]
+            )
 
         ask_arr_to_update = np.asfarray(message["data"]["a"])
         matching_ask_prices = current_asks_arr[
@@ -89,11 +94,14 @@ def on_message(ws, message):
         ][0]
 
         for price, volume in ask_arr_to_update:
-            if price in matching_ask_prices:
-                ind = np.where(current_asks_arr[:, 0] == price)
+            ind = np.where(current_asks_arr[:, 0] == price)
+            if volume == 0:
+                current_asks_arr = np.delete(current_asks_arr, ind, axis=0)
+            elif price in matching_ask_prices:
                 current_asks_arr[ind, 1] = volume
             else:
                 current_asks_arr = np.vstack([current_asks_arr, [price, volume]])
+
         partly_filtered_current_asks = current_asks_arr[
             current_asks_arr[:, 0] > np.float64(current_price)
         ]
@@ -103,9 +111,12 @@ def on_message(ws, message):
         lowest_5000_asks = sorted_partly_filtered_current_asks[:5000]
         volume_of_5000_asks = np.sum(lowest_5000_asks[:, 1])
 
-        weighted_avg_ask_price = np.average(
-            lowest_5000_asks[:, 0], weights=lowest_5000_asks[:, 1]
-        )
+        if volume_of_5000_asks == 0:
+            weighted_avg_ask_price = 0
+        else:
+            weighted_avg_ask_price = np.average(
+                lowest_5000_asks[:, 0], weights=lowest_5000_asks[:, 1]
+            )
 
         crud.add_btc_timestamp_data(
             data=BTC_TimestampData(
@@ -121,18 +132,18 @@ def on_message(ws, message):
 
 def on_open(ws):
     tg_popup = f"Data Gathering App launched Bitcoin websocket connection."
-    send_telegram_message(settings.TELEGRAM_CHAT_ID, message=tg_popup)
+    send_telegram_message.apply_async(settings.TELEGRAM_CHAT_ID, message=tg_popup)
 
 
 # TODO: Add kafka integration for messaging
 def on_error(ws, message):
     tg_popup = f"Data Gathering App encounterd an error on Bitcoin socket or was simply closed. {message}"
-    send_telegram_message(settings.TELEGRAM_CHAT_ID, message=tg_popup)
+    send_telegram_message.apply_async(settings.TELEGRAM_CHAT_ID, message=tg_popup)
 
 
 def on_close(ws, message, _):
     tg_popup = f"Data Gathering Bitcoin websocket was closed."
-    send_telegram_message(settings.TELEGRAM_CHAT_ID, message=tg_popup)
+    send_telegram_message.apply_async(settings.TELEGRAM_CHAT_ID, message=tg_popup)
 
 
 def start_bitcoin_data_stream():
@@ -154,7 +165,7 @@ def start_bitcoin_data_stream():
         create_initial_order_book()
         ws.run_forever()
     except Exception as e:
-        send_telegram_message(
+        send_telegram_message.apply_async(
             settings.TELEGRAM_CHAT_ID,
             message=f"Failed to establish websocket connection. {e}",
         )

@@ -1,11 +1,11 @@
 from collections.abc import Generator
 from typing import Annotated
 
-from config import settings
+from app.config import settings
 from fastapi import Depends
 from sqlmodel import Session, create_engine
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI), echo=True)
+engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 
 
 def get_db() -> Generator[Session, None, None]:

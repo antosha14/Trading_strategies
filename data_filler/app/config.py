@@ -13,9 +13,12 @@ def parse_cors(v: Any) -> list[str] | str:
     raise ValueError(v)
 
 
+## TODO: change link and do debugging right
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file="../.env", env_ignore_empty=True, extra="ignore"
+        env_file="../.env",
+        env_ignore_empty=True,
+        extra="ignore",
     )
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str
@@ -63,6 +66,9 @@ class Settings(BaseSettings):
     USERS_OPEN_REGISTRATION: bool = False
     TELEGRAM_CHAT_ID: int
     TELEGRAM_BOT_TOKEN: str
+    RABBITMQ_DEFAULT_VHOST: str
+    RABBITMQ_DEFAULT_USER: str
+    RABBITMQ_DEFAULT_PASS: str
 
 
 settings = Settings()  # type: ignore

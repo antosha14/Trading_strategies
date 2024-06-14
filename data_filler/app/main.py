@@ -1,13 +1,11 @@
 from time import sleep
 
-from bitcoin_socket import start_bitcoin_data_stream
-
 # import uvicorn
-from config import settings
+from app.bitcoin_socket import start_bitcoin_data_stream
+from app.config import settings
+from app.routes import router
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
-from routes import router
-from sp500_socket import start_sap500_data_stream
 from starlette.middleware.cors import CORSMiddleware
 
 
@@ -36,6 +34,6 @@ if settings.BACKEND_CORS_ORIGINS:
 
 app.include_router(router, prefix=settings.API_V1_STR)
 
-if __name__ == "main":
-    # uvicorn.run(app, host="127.0.0.1", port=8000)
-    start_bitcoin_data_stream()
+# if __name__ == "main":
+#    uvicorn.run(app, host="127.0.0.1", port=8888)
+#    start_bitcoin_data_stream()
