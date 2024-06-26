@@ -8,7 +8,7 @@ import requests
 import websocket
 from app.config import settings
 from app.models import BTC_TimestampData
-from app.tasks.telegram_messaging import send_telegram_message
+from services_and_queue.telegram_messaging import send_telegram_message
 
 btc_ticker_for_binance = "BTCUSDT"
 btc_subscribtion_str = (
@@ -132,18 +132,18 @@ def on_message(ws, message):
 
 def on_open(ws):
     tg_popup = f"Data Gathering App launched Bitcoin websocket connection."
-    send_telegram_message.apply_async(settings.TELEGRAM_CHAT_ID, message=tg_popup)
+    send_telegram_message.delay(settings.TELEGRAM_CHAT_ID, message=tg_popup)
 
 
 # TODO: Add kafka integration for messaging
 def on_error(ws, message):
     tg_popup = f"Data Gathering App encounterd an error on Bitcoin socket or was simply closed. {message}"
-    send_telegram_message.apply_async(settings.TELEGRAM_CHAT_ID, message=tg_popup)
+    send_telegram_message.delay(settings.TELEGRAM_CHAT_ID, message=tg_popup)
 
 
 def on_close(ws, message, _):
     tg_popup = f"Data Gathering Bitcoin websocket was closed."
-    send_telegram_message.apply_async(settings.TELEGRAM_CHAT_ID, message=tg_popup)
+    send_telegram_message.delay(settings.TELEGRAM_CHAT_ID, message=tg_popup)
 
 
 def start_bitcoin_data_stream():
@@ -165,7 +165,7 @@ def start_bitcoin_data_stream():
         create_initial_order_book()
         ws.run_forever()
     except Exception as e:
-        send_telegram_message.apply_async(
+        send_telegram_message.delay(
             settings.TELEGRAM_CHAT_ID,
             message=f"Failed to establish websocket connection. {e}",
         )

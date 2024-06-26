@@ -1,6 +1,8 @@
 /static
 /database/pgdata
 /app/__pycache__
-/database/.env
-/nginx/.env
-/data_filler/.env
+.env
+
+rabbitmq.conf
+definitions.json
+.erlang.cookie

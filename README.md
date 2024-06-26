@@ -33,3 +33,6 @@ Redis
 
 Оркестрация
 Кубернетес
+
+
+https://catalog.onliner.by/mobile/infinix/gt10pro8256blk

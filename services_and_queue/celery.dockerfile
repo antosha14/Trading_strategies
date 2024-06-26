@@ -1,6 +1,6 @@
 FROM python:3.12
 
-WORKDIR /code/
+WORKDIR /app/
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python && \
@@ -9,20 +9,21 @@ RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/opt/poetry python
     poetry config virtualenvs.create false
 
 # Copy poetry.lock* in case it doesn't exist in the repo
-COPY ./data_filler/pyproject.toml ./data_filler/poetry.lock /code/
+COPY ./data_filler/pyproject.toml ./data_filler/poetry.lock* /app/
 
 # Allow installing dev dependencies to run tests
-
 ARG INSTALL_DEV=false
 RUN bash -c "if [ $INSTALL_DEV == 'true' ] ; then poetry install --no-root ; else poetry install --no-root --only main ; fi"
 
-ENV PYTHONPATH=/code
+ENV C_FORCE_ROOT=1
 
-COPY ./data_filler/prestart.sh /code/
+ENV PYTHONPATH=/app
 
-COPY ./data_filler/app /code/app
-COPY ./services_and_queue /code/services_and_queue
+COPY ./services_and_queue/worker-start.sh /worker-start.sh
 
-EXPOSE 8888
+COPY ./data_filler/app /app/app
+COPY ./services_and_queue /app/services_and_queue
 
-CMD ["fastapi", "run", "./app/main.py", "--proxy-headers", "--port", "8888"]
+RUN chmod +x /worker-start.sh
+
+CMD ["bash", "/worker-start.sh"]

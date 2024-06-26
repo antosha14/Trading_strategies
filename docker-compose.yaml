@@ -1,4 +1,8 @@
 version: "3.3"
+networks:
+  main-network:
+    name: main-network
+
 services:
   db:
     image: postgres:16.2
@@ -14,6 +18,10 @@ services:
       - POSTGRES_DB=${POSTGRES_DB?Variable not set}
     ports:
       - 5432:5432
+    networks:
+      - main-network
+    expose:
+      - 5432
 
   adminer:
     image: adminer
@@ -24,17 +32,19 @@ services:
       - ADMINER_DESIGN=pepa-linha-dark
     ports:
       - 8080:8080
-
-  pgadmin:
-    image: dpage/pgadmin4:8.7
     networks:
-      - default
-    depends_on:
-      - db
-    env_file:
-      - .env
-    ports:
-      - "5050:5050"
+      - main-network
+
+  # pgadmin:
+  #   image: dpage/pgadmin4:8.7
+  #   networks:
+  #     - default
+  #   depends_on:
+  #     - db
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "5050:5050"
 
   queue:
     image: rabbitmq:3.13-management
@@ -45,25 +55,33 @@ services:
       - "5672:5672"
       - "15672:15672"
       - "15671:15671"
+    networks:
+      - main-network
 
   flower:
     image: mher/flower:2.0
     depends_on:
       - queue
+      - celeryworker
     ports:
       - "5555:5555"
     env_file:
       - .env
+    volumes:
+      - ./rabbitmq/wait_for_worker_l_flower.sh:/wait_for_worker_l_flower.sh
+    networks:
+      - main-network
     command:
-      - "--broker=amqp://guest@queue:5672//"
-      - "--broker_api=http://guest:guest@queue:15672/api//"
-    labels:
-      - traefik.enable=true
+      [
+        "/bin/sh",
+        "-c",
+        "chmod +x /wait_for_worker_l_flower.sh && /wait_for_worker_l_flower.sh",
+      ]
 
   data_filler:
     image: "${DOCKER_IMAGE_GATHERING?Variable not set}:${TAG-latest}"
     networks:
-      - default
+      - main-network
     depends_on:
       - db
       - queue
@@ -75,26 +93,100 @@ services:
       # Allow explicit env var override for tests
       - SMTP_HOST=${SMTP_HOST}
     build:
-      context: ./data_filler
-      dockerfile: data_filler.dockerfile
+      context: ./
+      dockerfile: ./data_filler/data_filler.dockerfile
       args:
         INSTALL_DEV: ${INSTALL_DEV-false}
     ports:
       - "8888:8888"
 
   celeryworker:
-    image: "${DOCKER_IMAGE_CELERYWORKER?Variable not set}:${TAG-latest}"
     depends_on:
       - db
       - queue
     env_file:
       - .env
     environment:
-      - SERVER_HOST=https://${DOMAIN?Variable not set}
-      # Allow explicit env var override for tests
-      - SMTP_HOST=${SMTP_HOST?Variable not set}
+      - BROKER_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@queue:5672/${RABBITMQ_DEFAULT_VHOST}
     build:
-      context: ./backend
-      dockerfile: celeryworker.dockerfile
+      context: ./
+      dockerfile: ./services_and_queue/celery.dockerfile
       args:
         INSTALL_DEV: ${INSTALL_DEV-false}
+    networks:
+      - main-network
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    depends_on:
+      - celeryworker
+      - flower
+    ports:
+      - "9090:9090"
+    networks:
+      - main-network
+    volumes:
+      - "./prometheus_and_grafana/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: grafana/grafana:10.4.4
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    networks:
+      - main-network
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+  elasticsearch:
+    image: elasticsearch:8.14.1
+    volumes:
+      - ./elk/elasticsearch/elastic_config.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - ./elk/elasticsearch/data:/usr/share/elasticsearch/data
+    environment:
+      ELASTIC_USERNAME: "elastic"
+      ELASTIC_PASSWORD: "MyPw123"
+      discovery.type: single-node
+    networks:
+      - main-network
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+
+  logstash:
+    image: logstash:7.17.22
+    volumes:
+      - ./elk/logstash/logstash_config.yml:/usr/share/logstash/config/logstash.yml:ro
+    ports:
+      - "5044:5044"
+      - "5000:5000"
+      - "9600:9600"
+    networks:
+      - main-network
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: kibana:7.17.22
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./elk/kibana/kibana_config.yml:/usr/share/kibana/config/kibana.yml:ro
+    networks:
+      - main-network
+    ports:
+      - "5601:5601"
+
+  nginx:
+    image: nginx:stable-alpine3.19
+    networks:
+      - main-network
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx/conf:/etc/nginx
+      - ../nginx/logs:/logs
+
+volumes:
+  grafana-storage:
