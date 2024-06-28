@@ -1,7 +1,6 @@
 from time import sleep
 
 # import uvicorn
-from app.bitcoin_socket import start_bitcoin_data_stream
 from app.config import settings
 from app.routes import router
 from fastapi import FastAPI
@@ -33,7 +32,3 @@ if settings.BACKEND_CORS_ORIGINS:
 
 
 app.include_router(router, prefix=settings.API_V1_STR)
-
-# if __name__ == "main":
-#    uvicorn.run(app, host="127.0.0.1", port=8888)
-#    start_bitcoin_data_stream()

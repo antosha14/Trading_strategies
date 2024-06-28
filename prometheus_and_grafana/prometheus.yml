@@ -9,3 +9,6 @@ scrape_configs:
   - job_name: flower
     static_configs:
       - targets: ["flower:5555"]
+  - job_name: fastapi-app
+    static_configs:
+      - targets: ["data_filler:8888"]

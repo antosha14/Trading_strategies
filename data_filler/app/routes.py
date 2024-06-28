@@ -17,4 +17,3 @@ def get_data() -> str:
 @router.get("/launch/")
 def start_stream() -> str:
     start_bitcoin_data_stream()
-    return f"Stream started"

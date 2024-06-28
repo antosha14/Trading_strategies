@@ -1,6 +1,9 @@
 # TODO: Rewrite using asincio
 import json
+import os
+import sys
 from datetime import datetime
+from pathlib import Path
 
 import app.crud as crud
 import numpy as np
@@ -8,6 +11,9 @@ import requests
 import websocket
 from app.config import settings
 from app.models import BTC_TimestampData
+
+sys.path.append(str(Path(os.path.dirname(__file__)).parent.parent))
+
 from services_and_queue.telegram_messaging import send_telegram_message
 
 btc_ticker_for_binance = "BTCUSDT"
