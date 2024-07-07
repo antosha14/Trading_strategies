@@ -89,7 +89,9 @@ async def start_bitcoin_data_stream():
     while True:
         try:
             global current_price, current_time
-            api_result = await asyncio.gather(create_order_book(), get_price())
+            api_result = await asyncio.gather(
+                create_order_book(), get_price(), asyncio.sleep(1)
+            )
             waiting_and_commit = await asyncio.gather(
                 commit_to_db(
                     api_result[1][0],
@@ -97,7 +99,6 @@ async def start_bitcoin_data_stream():
                     api_result[0][0],
                     api_result[1][1],
                 ),
-                asyncio.sleep(1),
             )
         except Exception as e:
             send_telegram_message.delay(
