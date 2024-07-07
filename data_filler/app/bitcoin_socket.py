@@ -1,14 +1,15 @@
 # TODO: Rewrite using asincio
+import asyncio
 import json
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
 
+import aiohttp
 import app.crud as crud
 import numpy as np
 import requests
-import websocket
 from app.config import settings
 from app.models import BTC_TimestampData
 
@@ -40,138 +41,67 @@ current_price = 0
 current_time = datetime.now().strftime(time_format_string)
 
 
-def create_initial_order_book():
-    response = requests.get(current_order_book_snapshot_link).json()
-    global current_bids_arr, current_asks_arr
-    current_bids_arr = np.asfarray(response["bids"])
-    current_asks_arr = np.asfarray(response["asks"])
+async def create_order_book():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(current_order_book_snapshot_link, proxy=None) as request:
+            response = await request.json()
+            global current_bids_arr, current_asks_arr
+            current_bids_arr = np.asfarray(response["bids"])
+            current_asks_arr = np.asfarray(response["asks"])
+            return [current_bids_arr, current_asks_arr]
 
 
-def price_data_parsing(data):
-    global current_price, current_time
-    current_price = data["data"]["k"]["c"]  # close price
-    current_time = datetime.fromtimestamp(data["data"]["E"] / 1000).strftime(
-        time_format_string
+async def get_price():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            pure_price_url, params={"symbol": btc_ticker_for_binance}, proxy=None
+        ) as request:
+            response = await request.json()
+            timestamp = datetime.now()
+            global current_price
+            current_price = float(response["price"])
+            return [current_price, timestamp]
+
+
+async def commit_to_db(current_price, ask_arr, bid_arr, price_resp_time):
+    timestamp = price_resp_time
+    volume_of_returned_bids = np.sum(bid_arr[:, 1])
+    volume_of_returned_asks = np.sum(ask_arr[:, 1])
+    weighted_avg_bid_price = np.average(bid_arr[:, 0], weights=bid_arr[:, 1])
+    weighted_avg_ask_price = np.average(ask_arr[:, 0], weights=ask_arr[:, 1])
+    crud.add_btc_timestamp_data(
+        data=BTC_TimestampData(
+            timestamp=timestamp,
+            price=current_price,
+            volume_5000_bids=volume_of_returned_bids,
+            volume_5000_asks=volume_of_returned_asks,
+            weighted_avg_bid_price=weighted_avg_bid_price,
+            weighted_avg_ask_price=weighted_avg_ask_price,
+        )
     )
 
 
-def on_message(ws, message):
-    global current_bids_arr, current_asks_arr
-    message = json.loads(message)
-    if message["stream"] == "btcusdt@kline_1s":
-        price_data_parsing(message)
-    else:
-        volume_time = datetime.fromtimestamp(message["data"]["E"] / 1000).strftime(
-            time_format_string
-        )
-        bid_arr_to_update = np.asfarray(message["data"]["b"])
-        matching_bid_prices = current_bids_arr[
-            np.where(np.isin(current_bids_arr[:, 0], bid_arr_to_update[:, 0]))
-        ][0]
-
-        for price, volume in bid_arr_to_update:
-            ind = np.where(current_bids_arr[:, 0] == price)
-            if volume == 0:
-                current_bids_arr = np.delete(current_bids_arr, ind, axis=0)
-            elif price in matching_bid_prices:
-                current_bids_arr[ind, 1] = volume
-            else:
-                current_bids_arr = np.vstack([current_bids_arr, [price, volume]])
-
-        partly_filtered_current_bids = current_bids_arr[
-            current_bids_arr[:, 0] < np.float64(current_price)
-        ]
-        sorted_partly_filtered_current_bids = np.sort(
-            partly_filtered_current_bids, axis=0
-        )[::-1]
-        highest_5000_bids = sorted_partly_filtered_current_bids[:5000]
-        volume_of_5000_bids = np.sum(highest_5000_bids[:, 1])
-
-        if volume_of_5000_bids == 0:
-            weighted_avg_bid_price = 0
-        else:
-            weighted_avg_bid_price = np.average(
-                highest_5000_bids[:, 0], weights=highest_5000_bids[:, 1]
+async def start_bitcoin_data_stream():
+    send_telegram_message.delay(
+        settings.TELEGRAM_CHAT_ID,
+        message=f"Data Gathering App was launched",
+    )
+    while True:
+        try:
+            global current_price, current_time
+            api_result = await asyncio.gather(create_order_book(), get_price())
+            waiting_and_commit = await asyncio.gather(
+                commit_to_db(
+                    api_result[1][0],
+                    api_result[0][1],
+                    api_result[0][0],
+                    api_result[1][1],
+                ),
+                asyncio.sleep(1),
             )
-
-        ask_arr_to_update = np.asfarray(message["data"]["a"])
-        matching_ask_prices = current_asks_arr[
-            np.where(np.isin(current_asks_arr[:, 0], ask_arr_to_update[:, 0]))
-        ][0]
-
-        for price, volume in ask_arr_to_update:
-            ind = np.where(current_asks_arr[:, 0] == price)
-            if volume == 0:
-                current_asks_arr = np.delete(current_asks_arr, ind, axis=0)
-            elif price in matching_ask_prices:
-                current_asks_arr[ind, 1] = volume
-            else:
-                current_asks_arr = np.vstack([current_asks_arr, [price, volume]])
-
-        partly_filtered_current_asks = current_asks_arr[
-            current_asks_arr[:, 0] > np.float64(current_price)
-        ]
-        sorted_partly_filtered_current_asks = np.sort(
-            partly_filtered_current_asks, axis=0
-        )
-        lowest_5000_asks = sorted_partly_filtered_current_asks[:5000]
-        volume_of_5000_asks = np.sum(lowest_5000_asks[:, 1])
-
-        if volume_of_5000_asks == 0:
-            weighted_avg_ask_price = 0
-        else:
-            weighted_avg_ask_price = np.average(
-                lowest_5000_asks[:, 0], weights=lowest_5000_asks[:, 1]
+        except Exception as e:
+            send_telegram_message.delay(
+                settings.TELEGRAM_CHAT_ID,
+                message=f"Data Gathering App encounterd an error on Bitcoin or was simply closed. {e}",
             )
-
-        crud.add_btc_timestamp_data(
-            data=BTC_TimestampData(
-                timestamp=volume_time,
-                price=current_price,
-                volume_5000_bids=volume_of_5000_bids,
-                volume_5000_asks=volume_of_5000_asks,
-                weighted_avg_bid_price=weighted_avg_bid_price,
-                weighted_avg_ask_price=weighted_avg_ask_price,
-            )
-        )
-
-
-def on_open(ws):
-    tg_popup = f"Data Gathering App launched Bitcoin websocket connection."
-    send_telegram_message.delay(settings.TELEGRAM_CHAT_ID, message=tg_popup)
-
-
-# TODO: Add kafka integration for messaging
-def on_error(ws, message):
-    tg_popup = f"Data Gathering App encounterd an error on Bitcoin socket or was simply closed. {message}"
-    send_telegram_message.delay(settings.TELEGRAM_CHAT_ID, message=tg_popup)
-
-
-def on_close(ws, message, _):
-    tg_popup = f"Data Gathering Bitcoin websocket was closed."
-    send_telegram_message.delay(settings.TELEGRAM_CHAT_ID, message=tg_popup)
-
-
-def start_bitcoin_data_stream():
-    try:
-        global current_price, current_time
-        current_price = float(
-            requests.get(
-                pure_price_url, params={"symbol": btc_ticker_for_binance}
-            ).json()["price"]
-        )
-        current_time = datetime.now().strftime(time_format_string)
-        ws = websocket.WebSocketApp(
-            binance_combined_websocket_url,
-            on_message=on_message,
-            on_error=on_error,
-            on_close=on_close,
-            on_open=on_open,
-        )
-        create_initial_order_book()
-        ws.run_forever()
-    except Exception as e:
-        send_telegram_message.delay(
-            settings.TELEGRAM_CHAT_ID,
-            message=f"Failed to establish websocket connection. {e}",
-        )
+            break

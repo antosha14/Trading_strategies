@@ -19,9 +19,9 @@ python-jose = "^3.3.0"
 yfinance = "^0.2.38"
 websocket-client = "^1.8.0"
 uvicorn = "^0.30.1"
-pysqlite3 = "^0.5.2"
 sentry-sdk = "^2.5.1"
 celery = "^5.4.0"
+aiohttp = "^3.9.5"
 
 
 [tool.poetry.group.dev.dependencies]
