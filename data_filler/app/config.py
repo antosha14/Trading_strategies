@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     USERS_OPEN_REGISTRATION: bool = False
     TELEGRAM_CHAT_ID: int
     TELEGRAM_BOT_TOKEN: str
+    RABBIT_DOMAIN: str
     RABBITMQ_DEFAULT_VHOST: str
     RABBITMQ_DEFAULT_USER: str
     RABBITMQ_DEFAULT_PASS: str

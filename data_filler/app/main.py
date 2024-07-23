@@ -1,6 +1,6 @@
 from time import sleep
 
-# import uvicorn
+import uvicorn
 from app.config import settings
 from app.routes import router
 from fastapi import FastAPI
@@ -32,3 +32,5 @@ if settings.BACKEND_CORS_ORIGINS:
 
 
 app.include_router(router, prefix=settings.API_V1_STR)
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8888)

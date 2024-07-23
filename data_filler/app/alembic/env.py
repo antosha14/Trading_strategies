@@ -5,7 +5,7 @@ from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
-load_dotenv(dotenv_path="./../.env", override=True)
+load_dotenv(dotenv_path="./../../.env", override=True)
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

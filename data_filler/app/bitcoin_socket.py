@@ -90,7 +90,7 @@ async def start_bitcoin_data_stream():
         try:
             global current_price, current_time
             api_result = await asyncio.gather(
-                create_order_book(), get_price(), asyncio.sleep(1)
+                create_order_book(), get_price(), asyncio.sleep(10)
             )
             waiting_and_commit = await asyncio.gather(
                 commit_to_db(
@@ -105,4 +105,4 @@ async def start_bitcoin_data_stream():
                 settings.TELEGRAM_CHAT_ID,
                 message=f"Data Gathering App encounterd an error on Bitcoin or was simply closed. {e}",
             )
-            break
+            await asyncio.sleep(10)
