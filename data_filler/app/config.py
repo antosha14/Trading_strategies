@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     RABBITMQ_DEFAULT_VHOST: str
     RABBITMQ_DEFAULT_USER: str
     RABBITMQ_DEFAULT_PASS: str
+    BINANCE_API_KEY: str
+    BINANCE_API_SECRET: str
 
 
 settings = Settings()  # type: ignore

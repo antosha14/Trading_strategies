@@ -14,7 +14,7 @@ from app.config import settings
 from app.models import BTC_TimestampData
 
 sys.path.append(str(Path(os.path.dirname(__file__)).parent.parent))
-
+from app.transactionMaker import makeBuyTransaction, makeSellTransaction
 from services_and_queue.telegram_messaging import send_telegram_message
 
 btc_ticker_for_binance = "BTCUSDT"
@@ -39,6 +39,7 @@ current_bids_arr = np.array(1)
 current_asks_arr = np.array(1)
 current_price = 0
 current_time = datetime.now().strftime(time_format_string)
+currOpen = False
 
 
 async def create_order_book():
@@ -69,6 +70,16 @@ async def commit_to_db(current_price, ask_arr, bid_arr, price_resp_time):
     volume_of_returned_asks = np.sum(ask_arr[:, 1])
     weighted_avg_bid_price = np.average(bid_arr[:, 0], weights=bid_arr[:, 1])
     weighted_avg_ask_price = np.average(ask_arr[:, 0], weights=ask_arr[:, 1])
+
+    global currOpen
+    if volume_of_returned_bids - volume_of_returned_asks >= 100 and currOpen == False:
+        makeBuyTransaction(current_price)
+        currOpen = True
+    elif volume_of_returned_bids - volume_of_returned_asks < 100 and currOpen == True:
+        makeSellTransaction()
+        currOpen = False
+        print("Sold")
+
     crud.add_btc_timestamp_data(
         data=BTC_TimestampData(
             timestamp=timestamp,
