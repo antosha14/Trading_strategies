@@ -1,38 +1,42 @@
-# Data gathering
+# Data gathering / Trading application for Bitcoin on Binance
 
-### Configuration of data gathering app is done by ./app/.env
+## Be careful, current strategy makes huge LOSSES!!
+### Configuration is done by ./app/.env
 
 _Primary configuration_
+Your .env file should contain this data: 
+```
+PROJECT_NAME=
 
-Adminer is running on http://localhost:8080/
+POSTGRES_SERVER=
+POSTGRES_PORT=
+POSTGRES_USER=
+POSTGRES_PASSWORD=
+POSTGRES_DB=
 
-Nginx
-Data gathering
-Model
-Transaction maker
-Portfolio watcher
-Telegram messaging
-Celery
-Flower
-Kafka
-Postgres
-Adminer
+PGDATA=
 
-Под вопросом:
-Поиск по индексации, сбор логов и их визуализация
-Elastic
-Logstash
-Kibana
+RABBIT_DOMAIN=
+RABBITMQ_DEFAULT_USER=
+RABBITMQ_DEFAULT_PASS=
+RABBITMQ_DEFAULT_VHOST=
 
-Мониторинг Api
-Prometeus
-Grafana
+DOCKER_IMAGE_GATHERING=
+DOMAIN=
+SMTP_HOST=
+ENVIRONMENT=
 
-Кэш
-Redis
+SECRET_KEY=
+TELEGRAM_CHAT_ID=
+TELEGRAM_BOT_TOKEN=
 
-Оркестрация
-Кубернетес
+FIRST_SUPERUSER=
+FIRST_SUPERUSER_PASSWORD=
+BINANCE_API_KEY=
+BINANCE_API_SECRET=
+```
 
-
-https://catalog.onliner.by/mobile/infinix/gt10pro8256blk
+### In order to run the app you need to have docker installed. Then you can launch the app with
+```
+docker compose up
+```
